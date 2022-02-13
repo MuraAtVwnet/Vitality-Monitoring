@@ -100,3 +100,8 @@ echo $ReturnValuse
 # Progress Preference 回復
 $ProgressPreference = $SaveProgressPreference
 
+# 後始末
+[array]$Jobs = Get-Job
+foreach($TergetJob in $Jobs){
+	Remove-Job -Id $TergetJob.Id
+}
