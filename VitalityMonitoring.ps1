@@ -20,7 +20,7 @@ function TestPing( $TergetNode ){
 	}
 	# PowerShell Core
 	else{
-		if( (Test-Connection $TergetNode -Count 1  -ErrorAction SilentlyContinue).Status -eq [System.Net.NetworkInformation.IPStatus]::Success){
+		if( (Test-Connection $TergetNode -Count 1 -ErrorAction SilentlyContinue).Status -eq [System.Net.NetworkInformation.IPStatus]::Success){
 			return $true
 		}
 		else{
@@ -40,6 +40,7 @@ function TestPort( [string]$TergetNode, [int]$TertgetPort ){
 	if($PSVersionTable.PSVersion.Major -eq 5){
 		$JobStatus = Start-Job -ScriptBlock {(Test-NetConnection $args[0] -Port $args[1]).TcpTestSucceeded} -ArgumentList $TergetNode, $TertgetPort
 	}
+	# PowerShell Core
 	else{
 		$JobStatus = Start-Job -ScriptBlock {Test-Connection $args[0] -TcpPort $args[1] } -ArgumentList $TergetNode, $TertgetPort
 	}
@@ -64,29 +65,57 @@ function TestPort( [string]$TergetNode, [int]$TertgetPort ){
 }
 
 #######################################################################
-# VM
+# port
 #######################################################################
-function TestVM( $TergetNode ){
-	# Windows Server 確認
-	if( (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue) -ne $null ){
-		# Hyper-V インストール確認
-		if((Get-WindowsFeature Hyper-V).Installed){
-			# VM 状態
-			$VM = Get-VM -Name $TergetNode -ErrorAction SilentlyContinue
-			if( $VM -eq $null ){
-				return $false
-			}
-			else{
-				if( $VM.State -eq [Microsoft.HyperV.PowerShell.VMState]::Running ){
-					return $true
-				}
-				else{
-					return $false
-				}
-			}
+function TestPort( [string]$TergetNode, [int]$TertgetPort ){
+	# 5 秒待つ
+	$TimeOut = 5
+
+	# Windows PowerShell
+	if($PSVersionTable.PSVersion.Major -eq 5){
+		$JobStatus = Start-Job -ScriptBlock {(Test-NetConnection $args[0] -Port $args[1]).TcpTestSucceeded} -ArgumentList $TergetNode, $TertgetPort
+	}
+	# PowerShell Core
+	else{
+		$JobStatus = Start-Job -ScriptBlock {Test-Connection $args[0] -TcpPort $args[1] } -ArgumentList $TergetNode, $TertgetPort
+	}
+
+	$Dummy = Wait-Job $JobStatus -Timeout $TimeOut
+	if( $JobStatus.State -eq "Completed"){
+		$JobReturn = Receive-Job $JobStatus
+		if( $JobReturn ){
+			return $true
+		}
+		else{
+			return $false
 		}
 	}
-	return $false
+	else{
+		# タイムアウト
+		$JobReturn = $false
+		# Stop-Job $JobStatus
+		# Remove-Job $JobStatus
+		return $false
+	}
+}
+
+
+#######################################################################
+# Web
+#######################################################################
+function TestWeb( $TergetURI ){
+
+	try{
+		$WebStatus = Invoke-WebRequest -Uri $TergetURI
+	}
+	catch{
+		return $false
+	}
+	if( $WebStatus.StatusCode -ne 200 ){
+		return $false
+	}
+
+	return $true
 }
 
 
